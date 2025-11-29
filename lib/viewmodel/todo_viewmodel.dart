@@ -3,8 +3,13 @@ import '../model/todo.dart';
 import 'dart:math';
 
 class TodoViewModel extends ChangeNotifier {
-  final List<Todo> _todos = [];
-  final List<String> _categories = ['General'];
+  final List<Todo> _todos = [
+    // Agregamos algunos datos de prueba
+    Todo(id: '1', title: 'Comprar frutas', description: 'Manzanas y plátanos', category: 'Casa', dueDate: DateTime.now().add(const Duration(days: 1))),
+    Todo(id: '2', title: 'Terminar informe', category: 'Trabajo', completed: true),
+    Todo(id: '3', title: 'Clase de Flutter', description: 'Revisar Provider y State Management', category: 'Estudio'),
+  ];
+  final List<String> _categories = ['General', 'Casa', 'Trabajo', 'Estudio'];
 
   List<Todo> get todos => List.unmodifiable(_todos);
   List<String> get categories => List.unmodifiable(_categories);
@@ -41,6 +46,7 @@ class TodoViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ✅ CORRECCIÓN FINAL: La función 'removeTodo' existe y es la que usamos en home_page.dart
   void removeTodo(String id) {
     _todos.removeWhere((t) => t.id == id);
     notifyListeners();

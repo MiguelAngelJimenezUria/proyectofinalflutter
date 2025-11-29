@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import 'view/home_page.dart';
 import 'view/styles.dart';
 import 'viewmodel/todo_viewmodel.dart';
@@ -21,7 +20,6 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
-          scaffoldBackgroundColor: AppColors.bg,
         ),
         home: const HomePage(),
       ),
