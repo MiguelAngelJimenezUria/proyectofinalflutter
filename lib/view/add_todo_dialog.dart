@@ -1,375 +1,291 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Importar para formateo de fecha
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart'; // Asegúrate de agregar la dependencia 'uuid' a tu pubspec.yaml
+
+import '../viewmodel/todo_viewmodel.dart';
 import 'styles.dart';
 
-class AddTodoResult {
-  final String title;
-  final String description;
-  final String? category;
-  final DateTime? dueDate;
+// Definición de tipos de callback
+typedef OnAddCategory = void Function(String category);
 
-  AddTodoResult({required this.title, this.description = '', this.category, this.dueDate});
-}
-
+// Definición del Widget de diálogo
 class AddTodoDialog extends StatefulWidget {
   final List<String> categories;
-  final void Function(String) onAddCategory;
+  final OnAddCategory onAddCategory;
 
-  const AddTodoDialog({super.key, required this.categories, required this.onAddCategory});
+  const AddTodoDialog({
+    super.key,
+    required this.categories,
+    required this.onAddCategory, // ✅ CORRECCIÓN DE ERROR 1 (image_574cb8.png)
+  });
 
   @override
   State<AddTodoDialog> createState() => _AddTodoDialogState();
 }
 
 class _AddTodoDialogState extends State<AddTodoDialog> {
-  final _titleController = TextEditingController();
-  final _descController = TextEditingController();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
   
-  late List<String> _localCategories;
-  int _selectedCategoryIndex = 0;
-  DateTime? _pickedDate;
-  TimeOfDay? _pickedTime;
+  String? _selectedCategory;
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
 
-  @override
-  void initState() {
-    super.initState();
-    _localCategories = List<String>.from(widget.categories);
-    if (_localCategories.isEmpty) {
-      _localCategories.add('General');
-    }
+@override
+void initState() {
+  super.initState();
+  
+  // 1. Intentar establecer 'General' como la categoría inicial.
+  String? initialCategory;
+
+  if (widget.categories.contains('General')) {
+    initialCategory = 'General';
+  } else if (widget.categories.isNotEmpty) {
+    // 2. Si no existe 'General', usar la primera categoría disponible.
+    initialCategory = widget.categories.first;
   }
+  
+  // 3. Establecer el estado. Si no hay categorías, _selectedCategory queda como null (String?).
+  _selectedCategory = initialCategory;
+}
 
   @override
   void dispose() {
     _titleController.dispose();
-    _descController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
-  DateTime? get _combinedDateTime {
-    if (_pickedDate == null) return null;
-    final t = _pickedTime ?? const TimeOfDay(hour: 0, minute: 0);
-    return DateTime(_pickedDate!.year, _pickedDate!.month, _pickedDate!.day, t.hour, t.minute);
-  }
+  // --- Funciones Auxiliares de UI ---
 
-  Future<void> _pickDate() async {
-    final d = await showDatePicker(
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _pickedDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2101),
       builder: (context, child) {
         return Theme(
           data: ThemeData.light().copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppColors.primary, // Color de acento en el picker
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primary,
               onPrimary: Colors.white,
-              surface: AppColors.cardColor,
               onSurface: AppColors.textPrimary,
             ),
-            dialogBackgroundColor: AppColors.cardColor,
           ),
           child: child!,
         );
-      }
+      },
     );
-    if (d != null) {
-      setState(() => _pickedDate = d);
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+      });
     }
   }
 
-  Future<void> _pickTime() async {
-    final t = await showTimePicker(
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: _pickedTime ?? TimeOfDay.now(),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppColors.primary, // Color de acento en el picker
-              onPrimary: Colors.white,
-              surface: AppColors.cardColor,
-              onSurface: AppColors.textPrimary,
-            ),
-            dialogBackgroundColor: AppColors.cardColor,
-          ),
-          child: child!,
-        );
-      }
+      initialTime: _selectedTime ?? TimeOfDay.now(),
     );
-    if (t != null) {
-      setState(() => _pickedTime = t);
+    if (picked != null) {
+      setState(() {
+        _selectedTime = picked;
+      });
     }
   }
-
-  Future<void> _addNewCategory() async {
-    final controller = TextEditingController();
-    final newCat = await showDialog<String>(
+  
+  void _showAddCategoryDialog(BuildContext context) {
+    String newCategoryName = '';
+    showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Nueva categoría'),
+      builder: (context) => AlertDialog(
+        title: const Text('Nueva Categoría'),
         content: TextField(
-          controller: controller,
           autofocus: true,
-          decoration: InputDecoration(
-            hintText: 'Nombre de la categoría',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
-            ),
-          ),
-          onSubmitted: (value) => Navigator.pop(ctx, value),
+          decoration: const InputDecoration(labelText: 'Nombre de la Categoría'),
+          onChanged: (value) => newCategoryName = value,
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar', style: TextStyle(color: AppColors.textPrimary)),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () {
-              final text = controller.text.trim();
-              Navigator.pop(ctx, text);
+              if (newCategoryName.trim().isNotEmpty) {
+                widget.onAddCategory(newCategoryName.trim());
+                setState(() {
+                  _selectedCategory = newCategoryName.trim();
+                });
+                Navigator.pop(context);
+              }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
             child: const Text('Agregar'),
           ),
         ],
       ),
     );
-
-    if (newCat != null && newCat.trim().isNotEmpty) {
-      final trimmed = newCat.trim();
-      if (!_localCategories.contains(trimmed)) {
-        setState(() {
-          _localCategories.add(trimmed);
-          _selectedCategoryIndex = _localCategories.length - 1;
-        });
-        widget.onAddCategory(trimmed);
-      }
-    }
   }
 
-  void _submit() {
-    final title = _titleController.text.trim();
-    if (title.isEmpty) return;
-
-    Navigator.pop(
-      context,
-      AddTodoResult(
-        title: title,
-        description: _descController.text.trim(),
-        category: _localCategories[_selectedCategoryIndex],
-        dueDate: _combinedDateTime,
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String labelText,
-    String? hintText,
-    required IconData icon,
-    int maxLines = 1,
-    TextInputAction action = TextInputAction.done,
-    bool autofocus = false,
-  }) {
-    return TextField(
-      controller: controller,
-      autofocus: autofocus,
-      maxLines: maxLines,
-      textInputAction: action,
-      decoration: InputDecoration(
-        labelText: labelText,
-        hintText: hintText,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        filled: true,
-        fillColor: Colors.grey.shade100,
-        prefixIcon: Icon(icon, color: AppColors.primary.withOpacity(0.7)),
-        contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-      ),
-    );
-  }
+  // --- Implementación Principal ---
 
   @override
   Widget build(BuildContext context) {
+    // Escucha el ViewModel solo para la función de guardar.
+    final viewModel = Provider.of<TodoViewModel>(context, listen: false);
+
+    // Combina fecha y hora si ambas están seleccionadas
+    DateTime? finalDueDate;
+    if (_selectedDate != null) {
+      finalDueDate = DateTime(
+        _selectedDate!.year,
+        _selectedDate!.month,
+        _selectedDate!.day,
+        _selectedTime?.hour ?? 23, // 23:59:00 si no se selecciona hora
+        _selectedTime?.minute ?? 59,
+      );
+    }
+    
     return AlertDialog(
+      title: const Text(
+        'Nueva Tarea', 
+        style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)
+      ),
+      contentPadding: const EdgeInsets.fromLTRB(20.0, 10.0, 20.0, 0),
+      backgroundColor: AppColors.cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Nueva Tarea', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+      
       content: SingleChildScrollView(
-        child: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.9,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTextField(
-                controller: _titleController,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Título
+            TextField(
+              controller: _titleController,
+              decoration: InputDecoration(
                 labelText: 'Título',
                 hintText: 'Ingresa el título de la tarea',
-                icon: Icons.title,
-                action: TextInputAction.next,
-                autofocus: true,
+                prefixIcon: const Icon(Icons.title, color: AppColors.primary),
+                labelStyle: TextStyle(color: AppColors.textPrimary.withOpacity(0.7)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _descController,
+            ),
+            const SizedBox(height: 15),
+
+            // 2. Descripción
+            TextField(
+              controller: _descriptionController,
+              decoration: InputDecoration(
                 labelText: 'Descripción (opcional)',
-                hintText: 'Detalles adicionales',
-                icon: Icons.description,
-                maxLines: 3,
+                prefixIcon: const Icon(Icons.description, color: AppColors.primary),
+                labelStyle: TextStyle(color: AppColors.textPrimary.withOpacity(0.7)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              const SizedBox(height: 20),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 20),
 
-              // Sección de Categoría
-              const Text('Categoría', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  ..._localCategories.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final cat = entry.value;
-                    final isSelected = index == _selectedCategoryIndex;
-                    return ChoiceChip(
-                      label: Text(cat),
-                      selected: isSelected,
-                      selectedColor: AppColors.primary.withOpacity(0.9),
-                      backgroundColor: Colors.grey.shade200,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: isSelected 
-                            ? BorderSide.none 
-                            : BorderSide(color: Colors.grey.shade300),
-                      ),
-                      onSelected: (_) {
-                        setState(() => _selectedCategoryIndex = index);
-                      },
-                    );
-                  }),
-                  ActionChip(
-                    label: const Text('Nueva', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
-                    avatar: const Icon(Icons.add, size: 18, color: AppColors.primary),
-                    backgroundColor: AppColors.primary.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    onPressed: _addNewCategory,
+            // 3. Selector de Categoría
+            Text('Categoría', style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary)),
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 4.0,
+              children: [
+                ...widget.categories.map((category) => ChoiceChip(
+                  label: Text(category),
+                  selected: _selectedCategory == category,
+                  selectedColor: AppColors.primary,
+                  onSelected: (selected) {
+                    setState(() {
+                      _selectedCategory = selected ? category : null;
+                    });
+                  },
+                  backgroundColor: AppColors.background,
+                  labelStyle: TextStyle(
+                    color: _selectedCategory == category ? AppColors.cardColor : AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Sección de Fecha y Hora
-              const Text('Fecha y hora', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
+                )),
+                // Botón para nueva categoría
+                ActionChip(
+                  avatar: const Icon(Icons.add, color: AppColors.primary, size: 18),
+                  label: const Text('Nueva', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  onPressed: () => _showAddCategoryDialog(context),
+                  backgroundColor: AppColors.background,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    side: const BorderSide(color: AppColors.primary, width: 1.5),
+                  ),
                 ),
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    _buildDateTimeRow(
-                      icon: Icons.calendar_today_outlined,
-                      label: _pickedDate == null
-                          ? 'Fecha de vencimiento (opcional)'
-                          : DateFormat.yMMMd().format(_pickedDate!),
-                      onPressed: _pickDate,
-                    ),
-                    const Divider(height: 20),
-                    _buildDateTimeRow(
-                      icon: Icons.access_time,
-                      label: _pickedTime == null 
-                          ? 'Hora (opcional)' 
-                          : _pickedTime!.format(context),
-                      onPressed: _pickTime,
-                    ),
-                    if (_pickedDate != null || _pickedTime != null)
-                      TextButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _pickedDate = null;
-                            _pickedTime = null;
-                          });
-                        },
-                        icon: const Icon(Icons.clear, size: 18),
-                        label: const Text('Limpiar fecha/hora'),
-                        style: TextButton.styleFrom(foregroundColor: AppColors.accent),
-                      ),
-                  ],
-                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            // 4. Fecha y Hora de Vencimiento
+            Text('Fecha y Hora', style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary)),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.calendar_today, color: AppColors.accent),
+              title: Text(_selectedDate == null 
+                  ? 'Fecha de vencimiento (opcional)'
+                  : 'Fecha: ${finalDueDate != null ? '${finalDueDate.day}/${finalDueDate.month}/${finalDueDate.year}' : ''}'),
+              trailing: TextButton(
+                onPressed: () => _selectDate(context),
+                child: const Text('Elegir', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
               ),
-            ],
-          ),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.schedule, color: AppColors.accent),
+              title: Text(_selectedTime == null 
+                  ? 'Hora (opcional)'
+                  : 'Hora: ${_selectedTime!.format(context)}'),
+              trailing: TextButton(
+                onPressed: () => _selectTime(context),
+                child: const Text('Elegir', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
         ),
       ),
-      actionsPadding: const EdgeInsets.all(16),
+
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar', style: TextStyle(color: AppColors.textPrimary)),
+          child: const Text('CANCELAR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
         ),
+        
         ElevatedButton.icon(
-          onPressed: _submit,
-          icon: const Icon(Icons.check, size: 20),
-          label: const Text('Agregar Tarea'),
+          // ✅ CORRECCIÓN DE FUNCIONALIDAD: Guardar la tarea
+          onPressed: () {
+            if (_titleController.text.trim().isNotEmpty) {
+              viewModel.addTodo(
+                title: _titleController.text,
+                description: _descriptionController.text,
+                dueDate: finalDueDate,
+                category: _selectedCategory,
+              );
+              Navigator.pop(context); // Cerrar el diálogo después de agregar
+            } else {
+              // Opcional: Mostrar un mensaje si el título está vacío
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('El título de la tarea es obligatorio.')),
+              );
+            }
+          },
+          icon: const Icon(Icons.check, color: AppColors.cardColor),
+          label: const Text('Agregar Tarea', style: TextStyle(color: AppColors.cardColor, fontWeight: FontWeight.bold)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+            elevation: 5,
           ),
         ),
       ],
     );
   }
-  
-  Widget _buildDateTimeRow({required IconData icon, required String label, required VoidCallback onPressed}) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: AppColors.primary),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-          ),
-        ),
-        TextButton(
-          onPressed: onPressed,
-          style: TextButton.styleFrom(foregroundColor: AppColors.accent),
-          child: const Text('Elegir'),
-        ),
-      ],
-    );
-  }
-}
-
-Future<AddTodoResult?> showAddTodoDialog(
-    BuildContext context, {
-  required List<String> categories,
-  required void Function(String) onAddCategory,
-}) {
-  return showDialog<AddTodoResult>(
-    context: context,
-    builder: (ctx) => AddTodoDialog(
-      categories: categories,
-      onAddCategory: onAddCategory,
-    ),
-  );
 }
