@@ -37,6 +37,7 @@ dependencies:
   provider: ^6.0.5
   intl: ^0.18.1 # Usa la versión más reciente
   uuid: ^4.0.0  # Necesaria para generar IDs únicos
+  table_calendar: ^3.0.9 #Calendario agregado
 
 dev_dependencies:
   flutter_test:
