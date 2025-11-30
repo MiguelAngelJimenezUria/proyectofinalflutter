@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:table_calendar/table_calendar.dart';
+import 'package:table_calendar/table_calendar.dart'; // Asegúrate de tener table_calendar instalado
 
 import '../model/todo.dart';
 import '../viewmodel/todo_viewmodel.dart';
 import 'styles.dart';
 
-// La función 'CalendarTab' ya existe en home_page.dart como StatelessWidget.
-// La convertimos a StatefulWidget para manejar el estado del calendario.
 class CalendarTab extends StatefulWidget {
   const CalendarTab({super.key});
 
@@ -34,22 +32,15 @@ class _CalendarTabState extends State<CalendarTab> {
     super.dispose();
   }
 
-  // --- Funciones de Gestión de Eventos (Tareas) ---
-
-  // 1. Obtiene las tareas para un día específico
   List<Todo> _getEventsForDay(DateTime day) {
-    // Usamos el ViewModel para obtener la lista completa de tareas
     final viewModel = Provider.of<TodoViewModel>(context, listen: false);
     
-    // Filtramos las tareas que tienen una fecha de vencimiento que coincide con 'day'
     return viewModel.todos.where((todo) {
       if (todo.dueDate == null) return false;
-      // Compara solo la fecha (año, mes, día)
       return isSameDay(todo.dueDate, day);
     }).toList();
   }
 
-  // 2. Maneja la selección de un día
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
     if (!isSameDay(_selectedDay, selectedDay)) {
       setState(() {
@@ -60,68 +51,63 @@ class _CalendarTabState extends State<CalendarTab> {
     }
   }
 
-  // --- Constructor de UI ---
-
   @override
   Widget build(BuildContext context) {
-    // Escuchar cambios en el ViewModel (cuando se agrega/elimina una tarea)
     return Consumer<TodoViewModel>(
       builder: (context, viewModel, child) {
-        // Asegurarse de que _selectedEvents se actualice si la lista de todos cambia
         if (_selectedDay != null) {
           _selectedEvents.value = _getEventsForDay(_selectedDay!);
         }
 
-        return Column(
-          children: [
-            // 1. Calendario (Inspirado en el diseño superior del ejemplo)
-            _buildCalendar(viewModel.todos),
+        return Scaffold( // Usamos Scaffold para asegurar que el cuerpo se centre y no se esconda por la barra de estado
+          backgroundColor: AppColors.background,
+          body: Column( // Column en lugar de Center para permitir el desplazamiento del calendario y lista
+            children: [
+              // Calendario
+              _buildCalendar(viewModel.todos),
 
-            // Línea separadora como en el diseño de referencia
-            const Divider(height: 1, color: Colors.grey),
-            
-            // 2. Título de Eventos (Similar a "The Emirates Wedding Party")
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Tareas para el ${_selectedDay != null ? _selectedDay!.day : ''}/${_selectedDay != null ? _selectedDay!.month : ''}',
-                style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
+              // Separador visual
+              const Divider(height: 1, color: Colors.grey),
+              
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Tareas para el ${_selectedDay != null ? _selectedDay!.day : ''}/${_selectedDay != null ? _selectedDay!.month : ''}',
+                  style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
+                ),
               ),
-            ),
 
-            // 3. Lista de Tareas para el Día Seleccionado
-            Expanded(
-              child: ValueListenableBuilder<List<Todo>>(
-                valueListenable: _selectedEvents,
-                builder: (context, value, _) {
-                  if (value.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No hay tareas pendientes para este día.',
-                        style: AppTextStyles.subtitle,
-                      ),
+              // Lista de Tareas para el Día Seleccionado
+              Expanded(
+                child: ValueListenableBuilder<List<Todo>>(
+                  valueListenable: _selectedEvents,
+                  builder: (context, value, _) {
+                    if (value.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No hay tareas pendientes para este día.',
+                          style: AppTextStyles.subtitle,
+                        ),
+                      );
+                    }
+                    return ListView.builder(
+                      itemCount: value.length,
+                      itemBuilder: (context, index) {
+                        final todo = value[index];
+                        return _buildTaskCard(todo, context);
+                      },
                     );
-                  }
-                  return ListView.builder(
-                    itemCount: value.length,
-                    itemBuilder: (context, index) {
-                      final todo = value[index];
-                      return _buildTaskCard(todo, context); // Usa el estilo de tarjeta del diseño de referencia
-                    },
-                  );
-                },
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
   }
 
-  // --- Widgets Auxiliares ---
-
   Widget _buildCalendar(List<Todo> allTodos) {
-    // Función local para obtener marcadores (puntos) para los días que tienen tareas
     List<Todo> getEventMarkers(DateTime day) {
       return allTodos.where((todo) {
         if (todo.dueDate == null) return false;
@@ -139,7 +125,6 @@ class _CalendarTabState extends State<CalendarTab> {
         CalendarFormat.month: 'Mes',
         CalendarFormat.week: 'Semana',
       },
-      // Estilo de calendario
       headerStyle: HeaderStyle(
         formatButtonDecoration: BoxDecoration(
           color: AppColors.primary,
@@ -151,23 +136,23 @@ class _CalendarTabState extends State<CalendarTab> {
         rightChevronIcon: const Icon(Icons.chevron_right, color: AppColors.textPrimary),
       ),
       calendarStyle: CalendarStyle(
-        // Días de la semana
         weekendTextStyle: TextStyle(color: AppColors.accent), 
-        // Número del día seleccionado
         selectedDecoration: const BoxDecoration(
           color: AppColors.primary, 
           shape: BoxShape.circle
         ),
-        // Número del día enfocado (actual)
         todayDecoration: BoxDecoration(
           color: AppColors.accent.withOpacity(0.5), 
           shape: BoxShape.circle
         ),
-        // Marcador de eventos (puntos debajo del número)
-        markerDecoration: BoxDecoration(
+        markerDecoration: const BoxDecoration(
           color: AppColors.accent,
           shape: BoxShape.circle,
         ),
+        // Color del texto de los días normales
+        defaultTextStyle: const TextStyle(color: AppColors.textPrimary),
+        // Color del texto de los días fuera de mes
+        outsideTextStyle: TextStyle(color: AppColors.textPrimary.withOpacity(0.4)),
       ),
       onDaySelected: _onDaySelected,
       onFormatChanged: (format) {
@@ -180,11 +165,11 @@ class _CalendarTabState extends State<CalendarTab> {
       onPageChanged: (focusedDay) {
         _focusedDay = focusedDay;
       },
-      eventLoader: getEventMarkers, // Usa la función de marcador de eventos
+      eventLoader: getEventMarkers,
     );
   }
   
-  // Widget de tarjeta de tarea (inspirado en la parte inferior del diseño de referencia)
+  // El widget _buildTaskCard es el mismo que antes, lo omito por brevedad pero inclúyelo
   Widget _buildTaskCard(Todo todo, BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -196,7 +181,6 @@ class _CalendarTabState extends State<CalendarTab> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icono o indicador (similar a la campana del diseño de referencia)
             Icon(
               todo.completed ? Icons.check_circle : Icons.access_time_filled,
               color: todo.completed ? Colors.green.shade600 : AppColors.primary,
@@ -204,7 +188,6 @@ class _CalendarTabState extends State<CalendarTab> {
             ),
             const SizedBox(width: 15),
 
-            // Título y detalles
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,7 +217,6 @@ class _CalendarTabState extends State<CalendarTab> {
               ),
             ),
             
-            // Sección de tiempo/estado (como la sección de precio en el diseño de referencia)
             if (todo.dueDate != null)
               Container(
                 padding: const EdgeInsets.only(left: 8),

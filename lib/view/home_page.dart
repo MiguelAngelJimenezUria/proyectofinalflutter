@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+// Rutas de importación: ajusta si tus archivos están en otra carpeta
 import '../viewmodel/todo_viewmodel.dart';
 import 'add_todo_dialog.dart';
 import 'todo_item_widget.dart';
 import 'styles.dart';
-import 'pomodoro_tabb.dart'; 
-import 'calendar_tab.dart';
 
+// Importaciones de Pestañas Funcionales (Deben estar en la misma carpeta 'view/')
+import 'calendar_tab.dart'; // Tu archivo funcional de calendario
+import 'pomodoro_tab.dart'; // Tu archivo funcional de pomodoro (corregido sin la doble 'b' si es posible)
 
-
+// Definición de las pestañas que permanecen en home_page.dart (si es que no tienen archivos separados)
 class TodoListTab extends StatelessWidget {
-  final Function showAddTodoDialog;
+  final void Function() showAddTodoDialog;
 
   const TodoListTab({super.key, required this.showAddTodoDialog});
 
@@ -39,9 +42,7 @@ class TodoListTab extends StatelessWidget {
             
             return TodoItemWidget(
               todo: todo,
-              // ✅ CORRECCIÓN DE TIPO: Acepta un parámetro (_) y llama a la función de toggle
               onToggle: (_) => viewModel.toggleTodo(todo.id),
-              // ✅ CORRECCIÓN DE TIPO: Acepta un parámetro (_) y llama a la función de remove
               onRemove: (_) => viewModel.removeTodo(todo.id),
             );
           },
@@ -51,27 +52,8 @@ class TodoListTab extends StatelessWidget {
   }
 }
 
-class CalendarTab extends StatelessWidget {
-  const CalendarTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text('Calendario', style: AppTextStyles.titleLarge.copyWith(color: AppColors.textPrimary)),
-    );
-  }
-}
-
-class PomodoroTab extends StatelessWidget {
-  const PomodoroTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text('Temporizador Pomodoro', style: AppTextStyles.titleLarge.copyWith(color: AppColors.textPrimary)),
-    );
-  }
-}
+// **IMPORTANTE:** Las clases CalendarTab y PomodoroTab fueron ELIMINADAS de aquí
+// y se usan las clases importadas de sus propios archivos.
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
@@ -102,9 +84,10 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    // ✅ Aquí se usan las clases importadas de los archivos separados
     _widgetOptions = <Widget>[
-      TodoListTab(showAddTodoDialog: _showAddTodoDialog),
-      const CalendarTab(),
+      TodoListTab(showAddTodoDialog: () => _showAddTodoDialog(context)),
+      const CalendarTab(), 
       const PomodoroTab(),
       const ProfileTab(),
     ];
@@ -116,7 +99,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  // ✅ CORRECCIÓN FINAL: Implementación correcta con parámetros requeridos por AddTodoDialog
   void _showAddTodoDialog(BuildContext context) {
     final viewModel = Provider.of<TodoViewModel>(context, listen: false);
 
@@ -137,7 +119,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final appBar = _selectedIndex == 0
         ? AppBar(
-            // ✅ CORRECCIÓN DE COLOR: Usamos AppColors.textPrimary
             title: const Text(
               'Mis Tareas Pendientes', 
               style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)
@@ -154,7 +135,6 @@ class _HomePageState extends State<HomePage> {
       
       body: _widgetOptions.elementAt(_selectedIndex), 
 
-      // Muestra el FAB solo en la pestaña de tareas (índice 0)
       floatingActionButton: _selectedIndex == 0 ? FloatingActionButton(
         onPressed: () => _showAddTodoDialog(context),
         backgroundColor: AppColors.accent,
@@ -162,7 +142,6 @@ class _HomePageState extends State<HomePage> {
         child: const Icon(Icons.add, color: Colors.white),
       ) : null,
       
-      // ✅ IMPLEMENTACIÓN DE BARRA DE NAVEGACIÓN INFERIOR
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(

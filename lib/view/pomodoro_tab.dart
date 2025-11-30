@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'styles.dart';
 
-// ✅ CORRECCIÓN: Definición del enum PomodoroState
 enum PomodoroState { work, shortBreak, longBreak }
 
 class PomodoroTab extends StatefulWidget {
@@ -13,20 +12,19 @@ class PomodoroTab extends StatefulWidget {
 }
 
 class _PomodoroTabState extends State<PomodoroTab> {
-  // Configuración del temporizador (en minutos)
-  static const int workDuration = 25;
+  // Configuración del temporizador (ahora es una variable mutable para el ajuste)
+  int _initialWorkDuration = 25; // En minutos
   static const int shortBreakDuration = 5;
   static const int longBreakDuration = 15;
   static const int cyclesBeforeLongBreak = 4;
 
-  // Variables de estado
-  int _currentDuration = workDuration * 60; // En segundos
+  int _currentDuration = 25 * 60; // Duración actual en segundos
   bool _isRunning = false;
   Timer? _timer;
   int _pomodoroCycles = 0;
-
-  // Estado inicial del ciclo Pomodoro
   PomodoroState _currentState = PomodoroState.work;
+
+  // --- Lógica de Control ---
 
   @override
   void dispose() {
@@ -34,13 +32,24 @@ class _PomodoroTabState extends State<PomodoroTab> {
     super.dispose();
   }
 
-  // --- Lógica del Temporizador ---
+  // Reinicia el temporizador al estado inicial basado en _currentState
+  void _setDurationBasedOnState() {
+    if (_currentState == PomodoroState.work) {
+      _currentDuration = _initialWorkDuration * 60;
+    } else if (_currentState == PomodoroState.shortBreak) {
+      _currentDuration = shortBreakDuration * 60;
+    } else {
+      _currentDuration = longBreakDuration * 60;
+    }
+  }
 
   void _startTimer() {
-    if (_timer != null) {
-      _timer!.cancel();
-    }
-    _isRunning = true;
+    if (_timer != null) _timer!.cancel();
+    if (_currentDuration == 0) _setDurationBasedOnState();
+
+    setState(() {
+      _isRunning = true;
+    });
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
@@ -59,9 +68,7 @@ class _PomodoroTabState extends State<PomodoroTab> {
   }
 
   void _pauseTimer() {
-    if (_timer != null) {
-      _timer!.cancel();
-    }
+    _timer?.cancel();
     setState(() {
       _isRunning = false;
     });
@@ -73,20 +80,18 @@ class _PomodoroTabState extends State<PomodoroTab> {
       _isRunning = false;
       _pomodoroCycles = 0;
       _currentState = PomodoroState.work;
-      _currentDuration = workDuration * 60;
+      _setDurationBasedOnState(); // Usa la duración inicial establecida
     });
   }
 
   void _handleTimerEnd() {
     _isRunning = false;
     
-    // Muestra una notificación/snackbar de fin de ciclo
+    // Muestra una notificación/snackbar
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _currentState == PomodoroState.work 
-            ? '¡Tiempo de trabajo terminado! Es hora de descansar.' 
-            : '¡Descanso terminado! Es hora de volver al trabajo.',
+          _currentState == PomodoroState.work ? '¡Tiempo de enfoque terminado!' : '¡Descanso terminado!',
           style: const TextStyle(color: AppColors.cardColor),
         ),
         backgroundColor: AppColors.primary,
@@ -99,26 +104,82 @@ class _PomodoroTabState extends State<PomodoroTab> {
       _pomodoroCycles++;
       if (_pomodoroCycles % cyclesBeforeLongBreak == 0) {
         _currentState = PomodoroState.longBreak;
-        _currentDuration = longBreakDuration * 60;
       } else {
         _currentState = PomodoroState.shortBreak;
-        _currentDuration = shortBreakDuration * 60;
       }
     } else {
-      // Regresar al trabajo después de cualquier descanso
       _currentState = PomodoroState.work;
-      _currentDuration = workDuration * 60;
     }
     
-    // Reiniciar automáticamente el siguiente ciclo (opcional: podrías dejarlo pausado)
+    _setDurationBasedOnState(); // Establece la duración del nuevo estado
     _startTimer();
   }
 
-  // --- Constructor de UI ---
+  // --- Configuración de Duración (Nuevo) ---
+
+  Future<void> _showDurationDialog() async {
+    _pauseTimer(); // Pausar mientras se configura
+    
+    int tempDuration = _initialWorkDuration;
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Configurar Tiempo de Enfoque (min)'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text('Duración actual: $tempDuration minutos'),
+                  Slider(
+                    value: tempDuration.toDouble(),
+                    min: 5,
+                    max: 60,
+                    divisions: 11, // Para ir de 5 en 5 (60-5)/5 + 1
+                    label: tempDuration.toString(),
+                    activeColor: AppColors.primary,
+                    onChanged: (double value) {
+                      setState(() {
+                        tempDuration = value.round();
+                      });
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancelar', style: TextStyle(color: AppColors.accent)),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Guardar', style: TextStyle(color: AppColors.primary)),
+              onPressed: () {
+                setState(() {
+                  _initialWorkDuration = tempDuration;
+                  _currentState = PomodoroState.work; // Volver al estado de trabajo
+                  _setDurationBasedOnState(); // Aplicar el nuevo tiempo
+                });
+                _resetTimer(); // Reinicia el ciclo con el nuevo tiempo
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- Constructor de UI (Modificado para centrado y estilo) ---
 
   @override
   Widget build(BuildContext context) {
-    // Formatear el tiempo a MM:SS
     String minutes = (_currentDuration ~/ 60).toString().padLeft(2, '0');
     String seconds = (_currentDuration % 60).toString().padLeft(2, '0');
 
@@ -128,90 +189,114 @@ class _PomodoroTabState extends State<PomodoroTab> {
             ? 'DESCANSO CORTO'
             : 'DESCANSO LARGO';
             
-    Color primaryColor = _currentState == PomodoroState.work ? AppColors.primary : AppColors.accent;
+    Color activeColor = _currentState == PomodoroState.work ? AppColors.primary : AppColors.accent;
 
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Título de estado
-          Text(
-            statusText,
-            style: AppTextStyles.titleLarge.copyWith(color: primaryColor),
-          ),
-          Text(
-            'Ciclos completados: $_pomodoroCycles',
-            style: AppTextStyles.subtitle,
-          ),
-          
-          const SizedBox(height: 40),
+    // Calcular la duración total del ciclo actual para el indicador de progreso
+    int totalDuration;
+    if (_currentState == PomodoroState.work) {
+      totalDuration = _initialWorkDuration * 60;
+    } else if (_currentState == PomodoroState.shortBreak) {
+      totalDuration = shortBreakDuration * 60;
+    } else {
+      totalDuration = longBreakDuration * 60;
+    }
+    double progressValue = 1 - (_currentDuration / totalDuration);
 
-          // Círculo del Temporizador
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              // Barra de progreso circular
-              SizedBox(
-                width: 250,
-                height: 250,
-                child: CircularProgressIndicator(
-                  value: 1 - (_currentDuration / (
-                    _currentState == PomodoroState.work ? workDuration * 60 : 
-                    _currentState == PomodoroState.shortBreak ? shortBreakDuration * 60 :
-                    longBreakDuration * 60
-                  )),
-                  strokeWidth: 15,
-                  backgroundColor: primaryColor.withOpacity(0.2),
-                  valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
-                ),
-              ),
-              // Texto del tiempo
-              Text(
-                '$minutes:$seconds',
-                style: const TextStyle(
-                  fontSize: 72,
-                  fontWeight: FontWeight.w100,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
+    return Center( // ✅ CENTRADO PRINCIPAL
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center, // Centrado vertical
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Título y Contador de Ciclos
+            Text(
+              statusText,
+              style: AppTextStyles.titleLarge.copyWith(color: activeColor),
+            ),
+            Text(
+              'Ciclos completados: $_pomodoroCycles',
+              style: AppTextStyles.subtitle,
+            ),
+            
+            const SizedBox(height: 40),
 
-          const SizedBox(height: 50),
+            // Círculo del Temporizador (Estilo de referencia)
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Barra de progreso circular
+                SizedBox(
+                  width: 250,
+                  height: 250,
+                  child: CircularProgressIndicator(
+                    value: progressValue.isNaN ? 0.0 : progressValue, // Manejo de NaN si totalDuration es 0
+                    strokeWidth: 15,
+                    backgroundColor: AppColors.cardColor, // Fondo más claro
+                    valueColor: AlwaysStoppedAnimation<Color>(activeColor),
+                  ),
+                ),
+                // Texto del tiempo
+                Text(
+                  '$minutes:$seconds',
+                  style: TextStyle(
+                    fontSize: 72,
+                    fontWeight: FontWeight.w200, // Fuente más delgada
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
 
-          // Botones de Control
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Botón Play/Pause
-              FloatingActionButton(
-                heroTag: 'pomodoro_play_pause',
-                onPressed: _isRunning ? _pauseTimer : _startTimer,
-                backgroundColor: primaryColor,
-                child: Icon(
-                  _isRunning ? Icons.pause : Icons.play_arrow,
-                  size: 35,
-                  color: Colors.white,
+            const SizedBox(height: 50),
+
+            // Botones de Control y Configuración
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Botón Play/Pause
+                FloatingActionButton(
+                  heroTag: 'pomodoro_play_pause',
+                  onPressed: _isRunning ? _pauseTimer : _startTimer,
+                  backgroundColor: activeColor,
+                  child: Icon(
+                    _isRunning ? Icons.pause : Icons.play_arrow,
+                    size: 35,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 30),
-              
-              // Botón Reset
-              FloatingActionButton(
-                heroTag: 'pomodoro_reset',
-                onPressed: _resetTimer,
-                backgroundColor: AppColors.background,
-                elevation: 0,
-                child: Icon(
-                  Icons.restore,
-                  size: 35,
-                  color: primaryColor,
+                const SizedBox(width: 30),
+                
+                // Botón Reset
+                FloatingActionButton(
+                  heroTag: 'pomodoro_reset',
+                  onPressed: _resetTimer,
+                  backgroundColor: AppColors.cardColor,
+                  elevation: 0,
+                  child: Icon(
+                    Icons.restore,
+                    size: 35,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 30),
+                
+                // Botón de Configuración de Tiempo (Nuevo)
+                FloatingActionButton(
+                  heroTag: 'pomodoro_config',
+                  onPressed: _showDurationDialog,
+                  backgroundColor: AppColors.cardColor,
+                  elevation: 0,
+                  child: const Icon(
+                    Icons.settings,
+                    size: 30,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
