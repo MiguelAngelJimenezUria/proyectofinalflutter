@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-// 🚨 NUEVAS IMPORTACIONES PARA AUTENTICACIÓN
+// Importaciones para autenticación
 import '../services/auth_service.dart'; 
-import 'auth_screen.dart'; 
 
-// Importaciones corregidas
+// Importaciones de modelos y viewmodels
 import '../model/todo.dart'; 
 import '../viewmodel/todo_viewmodel.dart';
 
@@ -31,8 +30,8 @@ class TodoListTab extends StatelessWidget {
 
   // 🆕 Función para mostrar los detalles de la tarea
   void _showTodoDetails(BuildContext context, Todo todo) {
-    // Definición del contexto del ViewModel para las acciones
-    final viewModel = Provider.of<TodoViewModel>(context, listen: false);
+    // Definición del contexto del ViewModel para las acciones (actualmente no usado, pero disponible para futuras acciones)
+    // final viewModel = Provider.of<TodoViewModel>(context, listen: false);
 
     showDialog(
       context: context,
@@ -270,44 +269,11 @@ class ProfileTab extends StatelessWidget {
     final authService = Provider.of<AuthService>(context);
     final todoViewModel = Provider.of<TodoViewModel>(context);
 
-    // 1. Si NO está autenticado, mostramos el botón de Login
-    if (!authService.isAuthenticated) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.person_off_outlined, size: 80, color: Colors.grey),
-            const SizedBox(height: 20),
-            Text('¡Bienvenido!', style: AppTextStyles.titleLarge.copyWith(color: AppColors.textPrimary)),
-            const SizedBox(height: 10),
-            Text('Inicia sesión para acceder a tu perfil.', style: AppTextStyles.subtitle),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: () {
-                // Navegar a la pantalla de login/registro
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (ctx) => const AuthScreen()),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Iniciar Sesión / Registrarse', style: TextStyle(color: Colors.white, fontSize: 16)),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // 2. Si SÍ está autenticado, mostramos el perfil del usuario
-    final user = authService.currentUser!;
-
+    // Mostrar el perfil del usuario autenticado
     return ListView(
       padding: const EdgeInsets.all(20.0),
       children: [
-        // 2.1. Sección de Encabezado/Foto
+        // Sección de Encabezado/Foto
         Center(
           child: Column(
             children: [
@@ -343,14 +309,14 @@ class ProfileTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 15),
-              // Nombre de Usuario (tomado de los metadatos)
+              // Nombre de Usuario
               Text(
                 authService.username, 
                 style: AppTextStyles.titleLarge.copyWith(fontSize: 24)
               ),
               // Email
               Text(
-                user.email ?? 'Email no disponible', 
+                authService.currentUser?.email ?? 'Email no disponible', 
                 style: AppTextStyles.subtitle.copyWith(color: AppColors.textSecondary)
               ),
             ],
@@ -359,13 +325,13 @@ class ProfileTab extends StatelessWidget {
         
         const Divider(height: 40, thickness: 1),
 
-        // 2.2. Opciones de Perfil
+        // Opciones de Perfil
         _buildProfileInfoTile(context, Icons.info_outline, 'Nombre de Usuario', authService.username, () => _editProfile(context, authService)),
         _buildProfileInfoTile(context, Icons.wc_outlined, 'Sexo', authService.gender, () => _editProfile(context, authService)),
 
         const SizedBox(height: 20),
 
-        // 2.3. Botón para ver tareas pendientes
+        // Botón para ver tareas pendientes
         ListTile(
           leading: const Icon(Icons.list_alt, color: AppColors.primary),
           title: Text('Ver Tareas Pendientes', style: TextStyle(color: AppColors.textPrimary)),
@@ -382,12 +348,14 @@ class ProfileTab extends StatelessWidget {
 
         const SizedBox(height: 30),
 
-        // 2.4. Botón de Cerrar Sesión
+        // Botón de Cerrar Sesión
         ElevatedButton.icon(
           icon: const Icon(Icons.logout, color: Colors.white),
           label: const Text('Cerrar Sesión', style: TextStyle(color: Colors.white, fontSize: 16)),
           onPressed: () async {
             await authService.signOut();
+            // Limpiar las tareas al cerrar sesión
+            todoViewModel.setUser(null);
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Sesión cerrada con éxito.')),
             );
@@ -445,6 +413,21 @@ class _HomePageState extends State<HomePage> {
       const PomodoroTab(),
       const ProfileTab(), // Ahora usa la lógica de autenticación
     ];
+    
+    // Cargar tareas del usuario al iniciar
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserTodos();
+    });
+  }
+
+  /// Cargar las tareas del usuario autenticado
+  void _loadUserTodos() {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final todoViewModel = Provider.of<TodoViewModel>(context, listen: false);
+    
+    if (authService.isAuthenticated && authService.userId != null) {
+      todoViewModel.setUser(authService.userId);
+    }
   }
 
   void _onItemTapped(int index) {

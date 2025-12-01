@@ -1,29 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // 👈 Importar Supabase
 import 'view/home_page.dart';
+import 'view/auth_screen.dart';
 import 'view/styles.dart';
 import 'viewmodel/todo_viewmodel.dart';
-
-// Importar el servicio de autenticación
-import 'services/auth_service.dart'; // Asegúrate de que esta ruta sea correcta
+import 'services/auth_service.dart';
 
 // ----------------------------------------------------------------------
-// 1. Inicialización de Supabase y Ejecución de la App
+// 1. Ejecución de la App (sin Supabase, usando backend Spring Boot)
 // ----------------------------------------------------------------------
 
 void main() async {
-  // Asegura que los bindings de Flutter estén inicializados
   WidgetsFlutterBinding.ensureInitialized(); 
-
-  // Inicialización de Supabase (¡MUY IMPORTANTE!)
-  // Las constantes supabaseUrl y supabaseAnonKey se obtienen de auth_service.dart
-  await Supabase.initialize(
-    url: supabaseUrl, 
-    anonKey: supabaseAnonKey,
-    debug: true,
-  );
-
   runApp(const MyApp());
 }
 
@@ -39,7 +27,7 @@ class MyApp extends StatelessWidget {
     // Usamos MultiProvider para gestionar el estado de varios ViewModels/Servicios
     return MultiProvider(
       providers: [
-        // Proveedor para la Autenticación de Supabase (AuthService)
+        // Proveedor para la Autenticación
         ChangeNotifierProvider(create: (_) => AuthService()), 
         
         // Proveedor existente para las Tareas (TodoViewModel)
@@ -47,12 +35,36 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'To‑Do App',
+        debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
         ),
-        home: const HomePage(),
+        home: const AuthWrapper(),
       ),
+    );
+  }
+}
+
+// ----------------------------------------------------------------------
+// 3. AuthWrapper - Decide qué pantalla mostrar
+// ----------------------------------------------------------------------
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthService>(
+      builder: (context, authService, child) {
+        // Si está autenticado, mostrar HomePage
+        if (authService.isAuthenticated) {
+          return const HomePage();
+        }
+        
+        // Si no está autenticado, mostrar AuthScreen
+        return const AuthScreen();
+      },
     );
   }
 }

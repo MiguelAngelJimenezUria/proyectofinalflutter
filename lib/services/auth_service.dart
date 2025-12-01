@@ -1,146 +1,168 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../model/user.dart';
+import 'api_service.dart';
 
-const String supabaseUrl = '[TU_URL_SUPABASE]'; 
-const String supabaseAnonKey = '[TU_ANON_KEY_SUPABASE]';
-
-final SupabaseClient supabase = Supabase.instance.client;
-
+/// Servicio de autenticación que usa el backend Spring Boot
 class AuthService with ChangeNotifier {
-  Session? _session;
-  Map<String, dynamic>? _userMetadata;
+  User? _currentUser;
+  
+  // Keys para almacenamiento
+  static const String _userIdKey = 'user_id';
+  static const String _userEmailKey = 'user_email';
 
-  bool get isAuthenticated => _session != null;
-  User? get currentUser => _session?.user;
-  String get username => _userMetadata?['username'] ?? 'Usuario';
-  String get gender => _userMetadata?['gender'] ?? 'No especificado';
-  String? get avatarUrl => _userMetadata?['avatar_url'] as String?;
+  bool get isAuthenticated => _currentUser != null;
+  User? get currentUser => _currentUser;
+  String get username => _currentUser?.username ?? 'Usuario';
+  String get gender => _currentUser?.gender ?? 'No especificado';
+  String? get avatarUrl => _currentUser?.avatarUrl;
+  String? get userId => _currentUser?.id;
 
   AuthService() {
-    _initAuthListener();
-    _loadInitialSession();
+    // Cargar usuario en background sin bloquear la UI
+    Future.microtask(() => _loadStoredUser());
   }
 
-  void _initAuthListener() {
-    supabase.auth.onAuthStateChange.listen((data) {
-      final AuthChangeEvent event = data.event;
-      _session = data.session;
-      _userMetadata = _session?.user.userMetadata;
-
-      if (event == AuthChangeEvent.signedIn || event == AuthChangeEvent.initialSession) {
-        _fetchUserMetadata(data.session?.user.id);
-      } else if (event == AuthChangeEvent.signedOut) {
-        _userMetadata = null; // Limpiar datos al cerrar sesión
+  /// Cargar usuario almacenado al iniciar la app
+  Future<void> _loadStoredUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final storedUserId = prefs.getString(_userIdKey);
+      final storedEmail = prefs.getString(_userEmailKey);
+      
+      if (storedUserId != null && storedEmail != null) {
+        // Por ahora solo crear el usuario con los datos guardados localmente
+        // No intentar conectar al servidor al iniciar
+        _currentUser = User(
+          id: storedUserId,
+          email: storedEmail,
+          username: storedEmail.split('@').first,
+        );
+        notifyListeners();
+        
+        // Intentar actualizar datos del servidor en segundo plano
+        _refreshUserDataInBackground(storedUserId);
       }
-      notifyListeners();
-    });
+    } catch (e) {
+      print('Error al cargar usuario almacenado: $e');
+      // No hacer nada si falla, simplemente no hay usuario guardado
+    }
   }
 
-  Future<void> _loadInitialSession() async {
-    final session = supabase.auth.currentSession;
-    if (session != null) {
-      _session = session;
-      await _fetchUserMetadata(session.user.id);
+  /// Refrescar datos del usuario en segundo plano
+  Future<void> _refreshUserDataInBackground(String userId) async {
+    try {
+      final user = await ApiService.getUserById(userId);
+      if (user != null) {
+        _currentUser = user;
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error al refrescar datos del usuario: $e');
+      // No hacer nada, usamos los datos locales
     }
-    notifyListeners();
   }
 
-  Future<void> _fetchUserMetadata(String? userId) async {
-    if (userId == null) return;
-    
-    final response = await supabase
-        .from('user_profiles')
-        .select()
-        .eq('id', userId)
-        .single()
-        .limit(1);
-
-    if (response != null) {
-        _userMetadata = response;
-    } else {
-        _userMetadata = {'username': currentUser?.email?.split('@').first ?? 'Nuevo Usuario', 'gender': 'No especificado'};
+  /// Guardar datos del usuario en almacenamiento
+  Future<void> _saveUserToStorage(User user) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_userIdKey, user.id);
+      await prefs.setString(_userEmailKey, user.email ?? '');
+    } catch (e) {
+      print('Error al guardar usuario: $e');
     }
-    notifyListeners();
+  }
+
+  /// Limpiar almacenamiento
+  Future<void> _clearStorage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_userIdKey);
+      await prefs.remove(_userEmailKey);
+    } catch (e) {
+      print('Error al limpiar almacenamiento: $e');
+    }
   }
 
   // ----------------------------------------------------------------------
-  // 2. MÉTODOS DE AUTENTICACIÓN
+  // MÉTODOS DE AUTENTICACIÓN
   // ----------------------------------------------------------------------
 
-  // 2.1. Login Convencional (Email/Password)
+  /// Login con email y contraseña
   Future<void> signIn(String email, String password) async {
     try {
-      await supabase.auth.signInWithPassword(email: email, password: password);
-    } on AuthException catch (e) {
-      throw e.message;
+      final user = await ApiService.login(email, password);
+      if (user != null) {
+        _currentUser = user;
+        await _saveUserToStorage(user);
+        notifyListeners();
+      } else {
+        throw 'Email o contraseña incorrectos';
+      }
     } catch (e) {
-      throw 'Ocurrió un error inesperado al iniciar sesión: $e';
+      throw 'Error al iniciar sesión: $e';
     }
   }
 
-  // 2.2. Registro Convencional (Email/Password + Metadatos)
+  /// Registro de nuevo usuario
   Future<void> signUp(String email, String password, String username, String gender) async {
     try {
-      final AuthResponse response = await supabase.auth.signUp(
-        email: email, 
+      final user = await ApiService.createUser(
+        email: email,
         password: password,
-        // Puedes añadir metadatos iniciales aquí, pero para datos sensibles es mejor una tabla aparte
-        data: {'username_temp': username, 'gender_temp': gender}, 
+        username: username,
+        gender: gender,
       );
       
-      final user = response.user;
       if (user != null) {
-        await supabase.from('user_profiles').insert({
-          'id': user.id,
-          'email': user.email,
-          'username': username,
-          'gender': gender,
-          'avatar_url': null,
-          'created_at': DateTime.now().toIso8601String(),
-        });
-        await _fetchUserMetadata(user.id);
+        _currentUser = user;
+        await _saveUserToStorage(user);
+        notifyListeners();
+      } else {
+        throw 'No se pudo crear el usuario';
       }
-      
-    } on AuthException catch (e) {
-      throw e.message;
     } catch (e) {
-      throw 'Ocurrió un error inesperado al registrarse: $e';
-    }
-  }
-  
-  Future<void> signInWithGoogle() async {
-    try {
-        await supabase.auth.signInWithOAuth(
-            OAuthProvider.google,
-            redirectTo: 'io.supabase.flutterquickstart://login-callback/',
-        );
-    } on AuthException catch (e) {
-      throw e.message;
-    } catch (e) {
-      throw 'Ocurrió un error inesperado con Google: $e';
+      throw 'Error al registrarse: $e';
     }
   }
 
+  /// Cerrar sesión
   Future<void> signOut() async {
-    await supabase.auth.signOut();
+    _currentUser = null;
+    await _clearStorage();
+    notifyListeners();
   }
 
+  /// Actualizar perfil del usuario (placeholder - necesitarás implementar endpoint en backend)
   Future<void> updateProfile({String? newUsername, String? newGender, String? newAvatarUrl}) async {
-    if (currentUser == null) return;
+    if (_currentUser == null) return;
     
-    final updates = <String, dynamic>{};
-    if (newUsername != null) updates['username'] = newUsername;
-    if (newGender != null) updates['gender'] = newGender;
-    if (newAvatarUrl != null) updates['avatar_url'] = newAvatarUrl;
+    // TODO: Implementar endpoint PUT /api/users/{id} en el backend Spring Boot
+    // Por ahora, solo actualizamos localmente
+    _currentUser = _currentUser!.copyWith(
+      username: newUsername,
+      gender: newGender,
+      avatarUrl: newAvatarUrl,
+    );
+    
+    await _saveUserToStorage(_currentUser!);
+    notifyListeners();
+  }
 
-    if (updates.isNotEmpty) {
-      await supabase
-        .from('user_profiles')
-        .update(updates)
-        .eq('id', currentUser!.id);
-        
-      await _fetchUserMetadata(currentUser!.id);
+  /// Refrescar datos del usuario actual
+  Future<void> refreshUser() async {
+    if (_currentUser == null) return;
+    
+    try {
+      final updatedUser = await ApiService.getUserById(_currentUser!.id);
+      if (updatedUser != null) {
+        _currentUser = updatedUser;
+        await _saveUserToStorage(updatedUser);
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error al refrescar usuario: $e');
     }
   }
-
 }

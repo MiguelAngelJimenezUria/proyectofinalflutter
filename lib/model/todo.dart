@@ -6,6 +6,7 @@ class Todo {
   final DateTime? dueDate;
   final bool completed;
   final DateTime createdAt;
+  final String? ownerId; // ID del usuario dueño (viene del backend)
 
   Todo({
     required this.id,
@@ -15,6 +16,7 @@ class Todo {
     this.dueDate,
     this.completed = false,
     DateTime? createdAt,
+    this.ownerId,
   }) : createdAt = createdAt ?? DateTime.now();
 
   Todo copyWith({
@@ -25,6 +27,7 @@ class Todo {
     DateTime? dueDate,
     bool? completed,
     DateTime? createdAt,
+    String? ownerId,
   }) {
     return Todo(
       id: id ?? this.id,
@@ -34,6 +37,7 @@ class Todo {
       dueDate: dueDate ?? this.dueDate,
       completed: completed ?? this.completed,
       createdAt: createdAt ?? this.createdAt,
+      ownerId: ownerId ?? this.ownerId,
     );
   }
 
@@ -45,18 +49,32 @@ class Todo {
         'dueDate': dueDate?.toIso8601String(),
         'completed': completed,
         'createdAt': createdAt.toIso8601String(),
+        if (ownerId != null) 'ownerId': ownerId,
       };
 
-  factory Todo.fromJson(Map<String, dynamic> json) => Todo(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        description: json['description'] as String? ?? '',
-        category: json['category'] as String?,
-        dueDate: json['dueDate'] == null ? null : DateTime.parse(json['dueDate'] as String),
-        completed: json['completed'] as bool? ?? false,
-        createdAt: DateTime.parse(json['createdAt'] as String),
-      );
+  factory Todo.fromJson(Map<String, dynamic> json) {
+    // Helper para parsear DateTime de manera segura
+    DateTime? parseDateTimeSafe(dynamic value) {
+      if (value == null) return null;
+      try {
+        return DateTime.parse(value.toString());
+      } catch (_) {
+        return null;
+      }
+    }
+
+    return Todo(
+      id: json['id']?.toString() ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      category: json['category'] as String?,
+      dueDate: parseDateTimeSafe(json['dueDate']),
+      completed: json['completed'] as bool? ?? false,
+      createdAt: parseDateTimeSafe(json['createdAt']) ?? DateTime.now(),
+      ownerId: json['ownerId']?.toString(),
+    );
+  }
 
   @override
-  String toString() => 'Todo(id: $id, title: $title, category: $category, due: $dueDate, completed: $completed)';
+  String toString() => 'Todo(id: $id, title: $title, category: $category, due: $dueDate, completed: $completed, ownerId: $ownerId)';
 }
