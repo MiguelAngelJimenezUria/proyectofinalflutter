@@ -33,18 +33,27 @@ class _AddTodoDialogState extends State<AddTodoDialog> {
 void initState() {
   super.initState();
   
-  // 1. Intentar establecer 'General' como la categoría inicial.
-  String? initialCategory;
+  // Obtener ViewModel para acceder a las categorías actuales
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final viewModel = Provider.of<TodoViewModel>(context, listen: false);
+    
+    // 1. Intentar establecer 'General' como la categoría inicial.
+    String? initialCategory;
 
-  if (widget.categories.contains('General')) {
-    initialCategory = 'General';
-  } else if (widget.categories.isNotEmpty) {
-    // 2. Si no existe 'General', usar la primera categoría disponible.
-    initialCategory = widget.categories.first;
-  }
-  
-  // 3. Establecer el estado. Si no hay categorías, _selectedCategory queda como null (String?).
-  _selectedCategory = initialCategory;
+    if (viewModel.categories.contains('General')) {
+      initialCategory = 'General';
+    } else if (viewModel.categories.isNotEmpty) {
+      // 2. Si no existe 'General', usar la primera categoría disponible.
+      initialCategory = viewModel.categories.first;
+    }
+    
+    // 3. Establecer el estado. Si no hay categorías, _selectedCategory queda como null (String?).
+    if (mounted) {
+      setState(() {
+        _selectedCategory = initialCategory;
+      });
+    }
+  });
 }
 
   @override
@@ -131,8 +140,10 @@ void initState() {
 
   @override
   Widget build(BuildContext context) {
-    // Escucha el ViewModel solo para la función de guardar.
-    final viewModel = Provider.of<TodoViewModel>(context, listen: false);
+    // ✅ CORRECCIÓN: Escuchar cambios del ViewModel para actualizar categorías
+    final viewModel = Provider.of<TodoViewModel>(context, listen: true);
+    // Usar las categorías del ViewModel en lugar de las del widget
+    final currentCategories = viewModel.categories;
 
     // Combina fecha y hora si ambas están seleccionadas
     DateTime? finalDueDate;
@@ -192,7 +203,7 @@ void initState() {
               spacing: 8.0,
               runSpacing: 4.0,
               children: [
-                ...widget.categories.map((category) => ChoiceChip(
+                ...currentCategories.map((category) => ChoiceChip(
                   label: Text(category),
                   selected: _selectedCategory == category,
                   selectedColor: AppColors.primary,

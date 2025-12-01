@@ -14,6 +14,16 @@ class ApiService {
   };
 
   // ============================================================
+  // HELPER: Formatear fecha para backend
+  // ============================================================
+  
+  /// Formatea DateTime a "2025-12-05T18:00:00" (sin milisegundos, sin Z)
+  static String? _formatDate(DateTime? date) {
+    if (date == null) return null;
+    return date.toIso8601String().split('.')[0];
+  }
+
+  // ============================================================
   // AUTENTICACIÓN (/api/auth)
   // ============================================================
 
@@ -151,7 +161,7 @@ class ApiService {
           'title': title,
           'description': description ?? '',
           'category': category,
-          'dueDate': dueDate?.toIso8601String(),
+          'dueDate': _formatDate(dueDate),
           'completed': completed,
         }),
       );
@@ -276,7 +286,7 @@ class ApiService {
           if (title != null) 'title': title,
           if (description != null) 'description': description,
           if (category != null) 'category': category,
-          if (dueDate != null) 'dueDate': dueDate.toIso8601String(),
+          if (dueDate != null) 'dueDate': _formatDate(dueDate),
           if (completed != null) 'completed': completed,
         }),
       );
