@@ -9,6 +9,7 @@ class AppColors {
   static const cardColor = Colors.white; // Color de las tarjetas
   static const shadowColor = Color(0xFF4A47A3); // Sombra sutil del primario
   static const Color textSecondary = Color(0xFF666666);
+  static const Color editActionColor = Color(0xFF4A47A3);
 }
 
 class AppTextStyles {
