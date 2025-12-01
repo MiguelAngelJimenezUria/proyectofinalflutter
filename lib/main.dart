@@ -18,6 +18,7 @@ class MyApp extends StatelessWidget {
       create: (_) => TodoViewModel(),
       child: MaterialApp(
         title: 'To‑Do App',
+        debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
