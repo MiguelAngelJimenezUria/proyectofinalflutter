@@ -1,55 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../model/todo.dart';
 import '../viewmodel/todo_viewmodel.dart';
 import 'styles.dart';
 
-// Definición del Widget de diálogo
-class AddTodoDialog extends StatefulWidget {
+class EditTodoDialog extends StatefulWidget {
+  final Todo todo;
   final List<String> categories;
 
-  const AddTodoDialog({
+  const EditTodoDialog({
     super.key,
+    required this.todo,
     required this.categories,
   });
 
   @override
-  State<AddTodoDialog> createState() => _AddTodoDialogState();
+  State<EditTodoDialog> createState() => _EditTodoDialogState();
 }
 
-class _AddTodoDialogState extends State<AddTodoDialog> {
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
+class _EditTodoDialogState extends State<EditTodoDialog> {
+  late TextEditingController _titleController;
+  late TextEditingController _descriptionController;
   
+  bool _debugInitLogged = false;
   String? _selectedCategory;
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
 
-@override
-void initState() {
-  super.initState();
-  
-  // Obtener ViewModel para acceder a las categorías actuales
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    final viewModel = Provider.of<TodoViewModel>(context, listen: false);
+  @override
+  void initState() {
+    super.initState();
     
-    // 1. Intentar establecer 'General' como la categoría inicial.
-    String? initialCategory;
-
-    if (viewModel.categories.contains('General')) {
-      initialCategory = 'General';
-    } else if (viewModel.categories.isNotEmpty) {
-      // 2. Si no existe 'General', usar la primera categoría disponible.
-      initialCategory = viewModel.categories.first;
+    // Debug: log that initState ran
+    try {
+      debugPrint('🛠️ EditTodoDialog.initState for todo id=${widget.todo.id}');
+      _debugInitLogged = true;
+    } catch (e) {
+      // ignore
     }
+    // Inicializar con los datos actuales de la tarea
+    _titleController = TextEditingController(text: widget.todo.title);
+    _descriptionController = TextEditingController(text: widget.todo.description);
+    _selectedCategory = widget.todo.category;
     
-    // 3. Establecer el estado. Si no hay categorías, _selectedCategory queda como null (String?).
-    if (mounted) {
-      setState(() {
-        _selectedCategory = initialCategory;
-      });
+    // Inicializar fecha y hora si existen
+    if (widget.todo.dueDate != null) {
+      _selectedDate = widget.todo.dueDate;
+      _selectedTime = TimeOfDay(
+        hour: widget.todo.dueDate!.hour,
+        minute: widget.todo.dueDate!.minute,
+      );
     }
-  });
-}
+  }
 
   @override
   void dispose() {
@@ -57,8 +59,6 @@ void initState() {
     _descriptionController.dispose();
     super.dispose();
   }
-
-  // --- Funciones Auxiliares de UI ---
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -97,15 +97,14 @@ void initState() {
       });
     }
   }
-
-  // --- Implementación Principal ---
+  
+  // adding categories removed
 
   @override
   Widget build(BuildContext context) {
-    // ✅ CORRECCIÓN: Escuchar cambios del ViewModel para actualizar categorías
-    final viewModel = Provider.of<TodoViewModel>(context, listen: true);
-    // Usar las categorías del ViewModel en lugar de las del widget
-    final currentCategories = viewModel.categories;
+    // Match AddTodoDialog: read the ViewModel to obtain current categories
+    final vm = Provider.of<TodoViewModel>(context, listen: true);
+    final currentCategories = vm.categories;
 
     // Combina fecha y hora si ambas están seleccionadas
     DateTime? finalDueDate;
@@ -114,14 +113,14 @@ void initState() {
         _selectedDate!.year,
         _selectedDate!.month,
         _selectedDate!.day,
-        _selectedTime?.hour ?? 23, // 23:59:00 si no se selecciona hora
+        _selectedTime?.hour ?? 23,
         _selectedTime?.minute ?? 59,
       );
     }
     
     return AlertDialog(
       title: const Text(
-        'Nueva Tarea', 
+        'Editar Tarea', 
         style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)
       ),
       contentPadding: const EdgeInsets.fromLTRB(20.0, 10.0, 20.0, 0),
@@ -180,7 +179,7 @@ void initState() {
                     fontWeight: FontWeight.w600,
                   ),
                 )),
-                // (Adding categories removed) no action chip
+                // (Adding categories removed)
               ],
             ),
             const SizedBox(height: 20),
@@ -193,9 +192,22 @@ void initState() {
               title: Text(_selectedDate == null 
                   ? 'Fecha de vencimiento (opcional)'
                   : 'Fecha: ${finalDueDate != null ? '${finalDueDate.day}/${finalDueDate.month}/${finalDueDate.year}' : ''}'),
-              trailing: TextButton(
-                onPressed: () => _selectDate(context),
-                child: const Text('Elegir', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_selectedDate != null)
+                    IconButton(
+                      icon: const Icon(Icons.clear, size: 20),
+                      onPressed: () => setState(() {
+                        _selectedDate = null;
+                        _selectedTime = null;
+                      }),
+                    ),
+                  TextButton(
+                    onPressed: () => _selectDate(context),
+                    child: const Text('Elegir', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
+                  ),
+                ],
               ),
             ),
             ListTile(
@@ -204,9 +216,19 @@ void initState() {
               title: Text(_selectedTime == null 
                   ? 'Hora (opcional)'
                   : 'Hora: ${_selectedTime!.format(context)}'),
-              trailing: TextButton(
-                onPressed: () => _selectTime(context),
-                child: const Text('Elegir', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_selectedTime != null)
+                    IconButton(
+                      icon: const Icon(Icons.clear, size: 20),
+                      onPressed: () => setState(() => _selectedTime = null),
+                    ),
+                  TextButton(
+                    onPressed: () => _selectTime(context),
+                    child: const Text('Elegir', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
+                  ),
+                ],
               ),
             ),
           ],
@@ -220,25 +242,43 @@ void initState() {
         ),
         
         ElevatedButton.icon(
-          // ✅ CORRECCIÓN DE FUNCIONALIDAD: Guardar la tarea
-          onPressed: () {
+          onPressed: () async {
             if (_titleController.text.trim().isNotEmpty) {
-              viewModel.addTodo(
-                title: _titleController.text,
-                description: _descriptionController.text,
-                dueDate: finalDueDate,
-                category: _selectedCategory,
-              );
-              Navigator.pop(context); // Cerrar el diálogo después de agregar
+              try {
+                await vm.editTodo(
+                  id: widget.todo.id,
+                  title: _titleController.text.trim(),
+                  description: _descriptionController.text.trim(),
+                  dueDate: finalDueDate,
+                  category: _selectedCategory,
+                );
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Tarea actualizada exitosamente'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error al actualizar: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             } else {
-              // Opcional: Mostrar un mensaje si el título está vacío
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('El título de la tarea es obligatorio.')),
               );
             }
           },
-          icon: const Icon(Icons.check, color: AppColors.cardColor),
-          label: const Text('Agregar Tarea', style: TextStyle(color: AppColors.cardColor, fontWeight: FontWeight.bold)),
+          icon: const Icon(Icons.save, color: AppColors.cardColor),
+          label: const Text('Guardar Cambios', style: TextStyle(color: AppColors.cardColor, fontWeight: FontWeight.bold)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

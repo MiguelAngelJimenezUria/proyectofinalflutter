@@ -47,8 +47,21 @@ class TodoViewModel extends ChangeNotifier {
     final n = name.trim();
     if (n.isEmpty) return;
     if (_categories.contains(n)) return;
-    _categories.add(n);
-    notifyListeners();
+    try {
+      debugPrint('🔧 TodoViewModel.addCategory BEFORE add: $n');
+      _categories.add(n);
+      // Notify listeners; wrap in try/catch to capture unexpected errors during rebuilds
+      try {
+        notifyListeners();
+        debugPrint('🔧 TodoViewModel.addCategory AFTER notifyListeners: $n');
+      } catch (e, st) {
+        debugPrint('❌ Error during notifyListeners in addCategory: $e\n$st');
+        rethrow;
+      }
+    } catch (e, st) {
+      debugPrint('❌ Unexpected error in addCategory: $e\n$st');
+      rethrow;
+    }
   }
 
   /// Agregar tarea (persiste en el backend)

@@ -36,44 +36,49 @@ class TodoItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 🆕 Paso 1: Envolver el Card en un GestureDetector
-    return GestureDetector(
-      onTap: () => onTap(todo), // Llama al nuevo callback al tocar
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: Card(
-          color: AppColors.cardColor,
-          elevation: 5,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Checkbox para el Toggle (si lo usas aquí)
-                InkWell(
-                  onTap: () => onToggle(todo.id),
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: todo.completed ? AppColors.accent : Colors.transparent,
-                      border: Border.all(
-                        color: todo.completed ? AppColors.accent : AppColors.textSecondary,
-                        width: 2,
-                      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Card(
+        color: AppColors.cardColor,
+        elevation: 5,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Checkbox para el Toggle
+              InkWell(
+                onTap: () {
+                  print('🔘 Checkbox tapped for: ${todo.title}');
+                  onToggle(todo.id);
+                },
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: todo.completed ? AppColors.accent : Colors.transparent,
+                    border: Border.all(
+                      color: todo.completed ? AppColors.accent : AppColors.textSecondary,
+                      width: 2,
                     ),
-                    child: todo.completed
-                        ? const Icon(Icons.check, size: 16.0, color: Colors.white)
-                        : null,
                   ),
+                  child: todo.completed
+                      ? const Icon(Icons.check, size: 16.0, color: Colors.white)
+                      : null,
                 ),
-                
-                const SizedBox(width: 12),
+              ),
+              
+              const SizedBox(width: 12),
 
-                // Contenido de la Tarea (Título y Categoría)
-                Expanded(
+              // Contenido de la Tarea (Título y Categoría) - CLICKEABLE
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    print('📝 Texto tapped for: ${todo.title}');
+                    onTap(todo);
+                  },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -100,21 +105,18 @@ class TodoItemWidget extends StatelessWidget {
                     ],
                   ),
                 ),
+              ),
 
-                // 🆕 Botón de Editar (Dirección opuesta al botón de borrar)
-                // Usaremos un Container y un Row para alinear los dos íconos a la derecha
-                Row(
-                  children: [
-                    // Botón de Editar
-                IconButton(
-                  icon: const Icon(Icons.edit, color: AppColors.textSecondary),
-                  onPressed: () => onTap(todo), // Usa onTap para abrir la edición/detalles
-                  tooltip: 'Editar Tarea',
-                ),
-                  ],
-                ),
-              ],
-            ),
+              // Botón de Editar
+              IconButton(
+                icon: const Icon(Icons.edit, color: AppColors.textSecondary),
+                onPressed: () {
+                  print('✏️ Edit button tapped for: ${todo.title}');
+                  onTap(todo);
+                },
+                tooltip: 'Editar Tarea',
+              ),
+            ],
           ),
         ),
       ),

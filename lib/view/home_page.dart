@@ -10,6 +10,7 @@ import '../viewmodel/todo_viewmodel.dart';
 
 // Importaciones de Vistas y Estilos
 import 'add_todo_dialog.dart';
+import 'edit_todo_dialog.dart';
 import 'todo_item_widget.dart';
 import 'styles.dart';
 
@@ -28,68 +29,29 @@ class TodoListTab extends StatelessWidget {
 
   const TodoListTab({super.key, required this.showAddTodoDialog});
 
-  // 🆕 Función para mostrar los detalles de la tarea
+  // Función para abrir directamente el diálogo de edición
   void _showTodoDetails(BuildContext context, Todo todo) {
-    // Definición del contexto del ViewModel para las acciones (actualmente no usado, pero disponible para futuras acciones)
-    // final viewModel = Provider.of<TodoViewModel>(context, listen: false);
-
+    print('🔍 Abriendo EditTodoDialog para: ${todo.title}');
+    final viewModel = Provider.of<TodoViewModel>(context, listen: false);
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text(todo.title, style: AppTextStyles.titleLarge.copyWith(fontSize: 20)),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
-                Text(
-                  todo.description.isNotEmpty ? todo.description : 'Sin descripción detallada.',
-                  style: AppTextStyles.subtitle.copyWith(fontSize: 16, color: AppColors.textPrimary),
-                ),
-                const SizedBox(height: 10),
-                Text('Categoría: ${todo.category ?? 'Ninguna'}', style: AppTextStyles.subtitle),
-                if (todo.dueDate != null)
-                  Text(
-                    'Vencimiento: ${todo.dueDate!.day}/${todo.dueDate!.month} a las ${todo.dueDate!.hour.toString().padLeft(2, '0')}:${todo.dueDate!.minute.toString().padLeft(2, '0')}', 
-                    style: AppTextStyles.subtitle
-                  ),
-                const Divider(),
-                Text('Estado: ${todo.completed ? 'Completada' : 'Pendiente'}', style: AppTextStyles.subtitle),
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            // Botón de Edición (Llamará a la función de edición real)
-            TextButton(
-              child: const Text('Editar', style: TextStyle(color: AppColors.primary)),
-              onPressed: () {
-                Navigator.of(dialogContext).pop(); 
-                // Placeholder para la acción de edición
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Abriendo edición para: ${todo.title}')),
-                );
-              },
-            ),
-            TextButton(
-              child: const Text('Cerrar', style: TextStyle(color: AppColors.accent)),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-          ],
+        print('✅ Builder ejecutándose');
+        // Pasamos el viewModel al widget para evitar problemas de contexto del Provider dentro del modal
+        return EditTodoDialog(
+          todo: todo,
+          categories: viewModel.categories,
         );
       },
-    );
-  }
-
-  // Función placeholder para edición al deslizar
-  void _handleEditSwipe(BuildContext context, Todo todo) {
-    // Aquí podrías abrir el mismo diálogo de edición que el botón
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Tarea "${todo.title}" lista para editar.'),
-            backgroundColor: AppColors.editActionColor,
-        ),
-    );
+    ).then((value) {
+      print('Dialog cerrado con valor: $value');
+    }).catchError((error) {
+      print('❌ Error en dialog: $error');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
+      );
+    });
   }
 
   @override
@@ -115,22 +77,13 @@ class TodoListTab extends StatelessWidget {
           itemBuilder: (context, index) {
             final todo = viewModel.todos[index];
             
-            // ⭐️ Implementación de Dismissible para swipe de Editar y Eliminar
+            // ⭐️ Implementación de Dismissible solo para ELIMINAR (swipe izquierda)
             return Dismissible(
               key: Key(todo.id), 
-              direction: DismissDirection.horizontal,
-
-              // SWIPE A LA DERECHA (startToEnd) -> EDITAR
-              background: Container(
-                color: AppColors.editActionColor, 
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.only(left: 20.0),
-                margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                child: const Icon(Icons.edit, color: Colors.white, size: 30),
-              ),
+              direction: DismissDirection.endToStart, // Solo swipe a la izquierda
 
               // SWIPE A LA IZQUIERDA (endToStart) -> ELIMINAR
-              secondaryBackground: Container(
+              background: Container(
                 color: AppColors.accent, 
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 20.0),
@@ -139,43 +92,34 @@ class TodoListTab extends StatelessWidget {
               ),
 
               confirmDismiss: (direction) async {
-                if (direction == DismissDirection.endToStart) {
-                  // Confirmación para eliminar
-                  return await showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: const Text("Confirmar Eliminación"),
-                        content: Text("¿Estás seguro de que quieres eliminar la tarea: ${todo.title}?"),
-                        actions: <Widget>[
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text("Cancelar"),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(true),
-                            child: const Text("Eliminar", style: TextStyle(color: AppColors.accent)),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                }
-                // Permitir el swipe para Editar sin confirmación (solo para la notificación)
-                return true; 
+                // Confirmación para eliminar
+                return await showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text("Confirmar Eliminación"),
+                      content: Text("¿Estás seguro de que quieres eliminar la tarea: ${todo.title}?"),
+                      actions: <Widget>[
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text("Cancelar"),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          child: const Text("Eliminar", style: TextStyle(color: AppColors.accent)),
+                        ),
+                      ],
+                    );
+                  },
+                );
               },
 
               onDismissed: (direction) {
-                if (direction == DismissDirection.endToStart) {
-                  // Eliminar la tarea
-                  viewModel.removeTodo(todo.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Tarea "${todo.title}" eliminada')),
-                  );
-                } else if (direction == DismissDirection.startToEnd) {
-                  // Acción de Editar
-                  _handleEditSwipe(context, todo);
-                }
+                // Eliminar la tarea
+                viewModel.removeTodo(todo.id);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Tarea "${todo.title}" eliminada')),
+                );
               },
               
               // El widget principal de la lista
@@ -443,10 +387,7 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (BuildContext context) {
         return AddTodoDialog(
-          categories: viewModel.categories, 
-          onAddCategory: (newCategory) {
-            viewModel.addCategory(newCategory); 
-          },
+          categories: viewModel.categories,
         );
       },
     );

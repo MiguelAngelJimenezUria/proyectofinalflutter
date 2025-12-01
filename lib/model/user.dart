@@ -46,19 +46,19 @@ class User {
 	/// Supabase) como camelCase (como se usa en el código Dart).
 	factory User.fromJson(Map<String, dynamic> json) {
 		// Helper para obtener valor con dos posibles keys
-		T? _get<T>(Map<String, dynamic> m, String camel, String snake) {
+		T? get<T>(Map<String, dynamic> m, String camel, String snake) {
 			if (m.containsKey(camel) && m[camel] != null) return m[camel] as T;
 			if (m.containsKey(snake) && m[snake] != null) return m[snake] as T;
 			return null;
 		}
 
-		final id = _get<String>(json, 'id', 'id') ?? '';
-		final email = _get<String>(json, 'email', 'email');
-		final username = _get<String>(json, 'username', 'username') ?? '';
-		final gender = _get<String>(json, 'gender', 'gender');
-		final avatarUrl = _get<String>(json, 'avatarUrl', 'avatar_url');
+		final id = get<String>(json, 'id', 'id') ?? '';
+		final email = get<String>(json, 'email', 'email');
+		final username = get<String>(json, 'username', 'username') ?? '';
+		final gender = get<String>(json, 'gender', 'gender');
+		final avatarUrl = get<String>(json, 'avatarUrl', 'avatar_url');
 
-		final createdAtStr = _get<String>(json, 'createdAt', 'created_at');
+		final createdAtStr = get<String>(json, 'createdAt', 'created_at');
 		DateTime createdAt;
 		if (createdAtStr != null) {
 			try {
